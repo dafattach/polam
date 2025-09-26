@@ -29,31 +29,46 @@ class TranskripController extends Controller
 
         $now = Carbon::now();
 
-        // prepare semester genap
-        $startSemester = Carbon::now()->startOfMonth()->setMonth(2); // 1 Februari Tahun Ini
-        $endSemester = Carbon::now()->startOfMonth()->setMonth(7)->endOfMonth(); // 31 Juli Tahun Ini
-        
-        // jika bulan sekarang > juni
-        if ($now->month > 6 || true) {
-            // prepare semester ganjil
-            $startSemester = Carbon::now()->startOfMonth()->setMonth(8); // 1 Agustus Tahun Ini
-            $endSemester = Carbon::now()->startOfMonth()->setMonth(1)->endOfMonth()->addYears(1); // 31 Januari Tahun Depan
+        // Determine current semester based on current date
+        // Even semester (genap): February 1st to July 31st (same year)
+        // Odd semester (ganjil): August 1st to January 31st (next year)
+
+        if ($now->month >= 2 && $now->month <= 7) {
+            // Even semester (genap): February 1st to July 31st
+            $startSemester = Carbon::now()->startOfMonth()->setMonth(2); // 1 Februari Tahun Ini
+            $endSemester = Carbon::now()->startOfMonth()->setMonth(7)->endOfMonth(); // 31 Juli Tahun Ini
+        } else {
+            // Odd semester (ganjil): August 1st to January 31st (next year)
+            if ($now->month >= 8) {
+                // August to December - current year to next year
+                $startSemester = Carbon::now()->startOfMonth()->setMonth(8); // 1 Agustus Tahun Ini
+                $endSemester = Carbon::now()->startOfMonth()->setMonth(1)->endOfMonth()->addYears(1); // 31 Januari Tahun Depan
+            } else {
+                // January - this is part of previous year's odd semester
+                $startSemester = Carbon::now()->startOfMonth()->setMonth(8)->subYears(1); // 1 Agustus Tahun Lalu
+                $endSemester = Carbon::now()->startOfMonth()->setMonth(1)->endOfMonth(); // 31 Januari Tahun Ini
+            }
         }
 
-        $isAlreadyAsk = Submission::where('user_id', Auth::id())->where('type', Submission::TYPES[8])
-        ->where(function ($query) use ($startSemester, $endSemester) {
-            $query->whereNull('approved_at')->whereNull('rejected_at')
-            ->whereDate('created_at', '>=', $startSemester)->whereDate('created_at', '<=', $endSemester);
-        })
-        ->orWhere(function ($query) use ($startSemester, $endSemester) {
-            $query->whereDate('approved_at', '>=', $startSemester)->whereDate('approved_at', '<=', $endSemester);
-        })
-        ->first();
+        // Count existing transcript requests in current semester
+        $existingRequestsCount = Submission::where('user_id', Auth::id())
+            ->where('type', Submission::TYPES[8])
+            ->where(function ($query) use ($startSemester, $endSemester) {
+                // Count pending requests (not yet approved/rejected)
+                $query->whereNull('approved_at')->whereNull('rejected_at')
+                ->whereDate('created_at', '>=', $startSemester)->whereDate('created_at', '<=', $endSemester);
+            })
+            ->orWhere(function ($query) use ($startSemester, $endSemester) {
+                // Count approved requests in current semester
+                $query->whereDate('approved_at', '>=', $startSemester)->whereDate('approved_at', '<=', $endSemester);
+            })
+            ->count();
 
-        if ($isAlreadyAsk) {
+        // Check if user has already reached the limit of 2 requests per semester
+        if ($existingRequestsCount >= 2) {
             return redirect()->route('surat-lainnya.transkrip.index')->with([
                 'status' => 'error',
-                'message' => 'Sudah pernah mengajukan dalam kurun waktu 1 semester',
+                'message' => 'Sudah mencapai batas maksimal 2 kali pengajuan dalam kurun waktu 1 semester',
             ]);
         }
 
