@@ -9,11 +9,14 @@ use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use App\Models\Employee\Employee;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\SubmissionOrderingService;
 
 class PengunduranDiriController extends Controller
 {
     function index(Request $request) {
-        $submissions = Submission::where('type', Submission::TYPES[7])->orderBy('created_at', 'desc')->paginate(10);
+        $query = Submission::where('type', Submission::TYPES[7]);
+        $submissionType = SubmissionOrderingService::getSubmissionTypeString(7);
+        $submissions = SubmissionOrderingService::applyOrdering($query, $submissionType)->paginate(10);
         return view('admin.surat-lainnya.pengunduran-diri.index', compact('submissions'));
     }
 

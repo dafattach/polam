@@ -8,11 +8,14 @@ use App\Models\Submission;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\SubmissionOrderingService;
 
 class BebasSanksiAkademikController extends Controller
 {
     function index(Request $request) {
-        $submissions = Submission::where('type', Submission::TYPES[4])->orderBy('created_at', 'desc')->paginate(10);
+        $query = Submission::where('type', Submission::TYPES[4]);
+        $submissionType = SubmissionOrderingService::getSubmissionTypeString(4);
+        $submissions = SubmissionOrderingService::applyOrdering($query, $submissionType)->paginate(10);
         return view('admin.surat-keterangan.bebas-sanksi-akademik.index', compact('submissions'));
     }
 

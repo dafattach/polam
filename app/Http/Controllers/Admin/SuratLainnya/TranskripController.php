@@ -7,11 +7,14 @@ use Illuminate\Http\Request;
 use App\Models\Submission;
 use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
+use App\Services\SubmissionOrderingService;
 
 class TranskripController extends Controller
 {
     function index(Request $request) {
-        $submissions = Submission::where('type', Submission::TYPES[8])->orderBy('created_at', 'desc')->paginate(10);
+        $query = Submission::where('type', Submission::TYPES[8]);
+        $submissionType = SubmissionOrderingService::getSubmissionTypeString(8);
+        $submissions = SubmissionOrderingService::applyOrdering($query, $submissionType)->paginate(10);
         return view('admin.surat-lainnya.transkrip.index', compact('submissions'));
     }
 
