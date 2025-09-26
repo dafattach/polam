@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Submission;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Models\Employee\Employee;
 use Carbon\Carbon;
@@ -54,21 +55,36 @@ class TranskripController extends Controller
         $existingRequestsCount = Submission::where('user_id', Auth::id())
             ->where('type', Submission::TYPES[8])
             ->where(function ($query) use ($startSemester, $endSemester) {
-                // Count pending requests (not yet approved/rejected)
-                $query->whereNull('approved_at')->whereNull('rejected_at')
-                ->whereDate('created_at', '>=', $startSemester)->whereDate('created_at', '<=', $endSemester);
-            })
-            ->orWhere(function ($query) use ($startSemester, $endSemester) {
-                // Count approved requests in current semester
-                $query->whereDate('approved_at', '>=', $startSemester)->whereDate('approved_at', '<=', $endSemester);
+                $query->where(function ($subQuery) use ($startSemester, $endSemester) {
+                    // Count pending requests (not yet approved/rejected)
+                    $subQuery->whereNull('approved_at')
+                        ->whereNull('rejected_at')
+                        ->whereDate('created_at', '>=', $startSemester)
+                        ->whereDate('created_at', '<=', $endSemester);
+                })->orWhere(function ($subQuery) use ($startSemester, $endSemester) {
+                    // Count approved requests in current semester
+                    $subQuery->whereNotNull('approved_at')
+                        ->whereDate('approved_at', '>=', $startSemester)
+                        ->whereDate('approved_at', '<=', $endSemester);
+                });
             })
             ->count();
+
+        // Debug information (remove this after testing)
+        \Log::info('Transcript Request Debug', [
+            'user_id' => Auth::id(),
+            'current_date' => $now->toDateString(),
+            'start_semester' => $startSemester->toDateString(),
+            'end_semester' => $endSemester->toDateString(),
+            'existing_count' => $existingRequestsCount,
+            'semester_type' => ($now->month >= 2 && $now->month <= 7) ? 'genap' : 'ganjil'
+        ]);
 
         // Check if user has already reached the limit of 2 requests per semester
         if ($existingRequestsCount >= 2) {
             return redirect()->route('surat-lainnya.transkrip.index')->with([
                 'status' => 'error',
-                'message' => 'Sudah mencapai batas maksimal 2 kali pengajuan dalam kurun waktu 1 semester',
+                'message' => "Sudah mencapai batas maksimal 2 kali pengajuan dalam kurun waktu 1 semester. Periode: {$startSemester->format('d M Y')} - {$endSemester->format('d M Y')} (Total: {$existingRequestsCount})",
             ]);
         }
 
