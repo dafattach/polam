@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Submission;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Barryvdh\DomPDF\Facade\Pdf;
 use App\Models\Employee\Employee;
 use Carbon\Carbon;
@@ -69,16 +68,6 @@ class TranskripController extends Controller
                 });
             })
             ->count();
-
-        // Debug information (remove this after testing)
-        \Log::info('Transcript Request Debug', [
-            'user_id' => Auth::id(),
-            'current_date' => $now->toDateString(),
-            'start_semester' => $startSemester->toDateString(),
-            'end_semester' => $endSemester->toDateString(),
-            'existing_count' => $existingRequestsCount,
-            'semester_type' => ($now->month >= 2 && $now->month <= 7) ? 'genap' : 'ganjil'
-        ]);
 
         // Check if user has already reached the limit of 2 requests per semester
         if ($existingRequestsCount >= 2) {
